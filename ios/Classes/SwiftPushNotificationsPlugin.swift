@@ -38,9 +38,9 @@ public class SwiftPushNotificationsPlugin: NSObject, FlutterPlugin, UNUserNotifi
         if let options = launchOptions as? [String: AnyObject] {
             if let notificationOptions = options[UIApplication.LaunchOptionsKey.remoteNotification.rawValue] as? [String: AnyObject] {
                 let notification = notificationOptions
-                let aps = notification["aps"] as? [String: AnyObject]
+                let data = notification as? [String: AnyObject]
                 pushOnState = PushOnState.onLaunch
-                receivedRemoteNofitication(data: aps ?? [:])
+                receivedRemoteNofitication(data: data ?? [:])
                 pushOnState = PushOnState.onMessage
             }
         }
@@ -75,7 +75,7 @@ public class SwiftPushNotificationsPlugin: NSObject, FlutterPlugin, UNUserNotifi
     
     public func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         let tokenParts = deviceToken.map { data -> String in
-            return String(format: "%02.2hhx", data as CVarArg)
+            return String(format: "%02.2hhx", data)
         }
         let token = tokenParts.joined()
         self.deviceToken = token
@@ -87,21 +87,23 @@ public class SwiftPushNotificationsPlugin: NSObject, FlutterPlugin, UNUserNotifi
     }
     
     public func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) -> Bool {
-        guard (userInfo["aps"] as? [String: AnyObject]) != nil else {
+        guard (userInfo as? [String: AnyObject]) != nil else {
             completionHandler(.failed)
             return false
         }
-        let aps = userInfo["aps"] as? [String: AnyObject]
-        receivedRemoteNofitication(data: aps ?? [:])
+        let data = userInfo as? [String: AnyObject]
+        receivedRemoteNofitication(data: data ?? [:])
         return true
     }
     
     func getNotificationSettings() {
         if #available(iOS 10.0, *) {
+            UNUserNotificationCenter.current().delegate = self
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
                 if let error = error {
                     print("getNotificationSettings \(error.localizedDescription)")
                 } else {
+                    guard granted else { return }
                     DispatchQueue.main.async {
                         UIApplication.shared.registerForRemoteNotifications()
                     }
